@@ -1,66 +1,74 @@
-import React from 'react';
-import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { json } from '@codemirror/lang-json';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { EditorView } from '@codemirror/view';
+import React, { useState, useEffect } from 'react';
+import { fileSystem } from '../services/fileSystem';
+import './FileViewer.css';
 
-const FileViewer = ({ content, language, filename }) => {
-  // Determine file extension
-  const ext = filename?.split('.').pop()?.toLowerCase();
+const FileViewer = ({ selectedFile }) => {
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Basic language detection based on file extension
-  const getLanguageExtension = () => {
-    switch (ext) {
-      case 'js':
-      case 'jsx':
-      case 'ts':
-      case 'tsx':
-        return javascript();
-      case 'html':
-      case 'htm':
-        return html();
-      case 'css':
-      case 'scss':
-      case 'less':
-        return css();
-      case 'json':
-        return json();
-      default:
-        return javascript();
-    }
-  };
+  useEffect(() => {
+    const loadContent = async () => {
+      if (!selectedFile) {
+        setContent('');
+        setError(null);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const fileContent = await fileSystem.readFile(selectedFile);
+        setContent(fileContent);
+      } catch (error) {
+        console.error('Error loading file content:', error);
+        setError('Error loading file content: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadContent();
+  }, [selectedFile]);
+
+  if (!selectedFile) {
+    return (
+      <div className="file-viewer empty">
+        <div className="empty-message">
+          Select a file to view its contents
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="file-viewer loading">
+        <div className="loading-spinner"></div>
+        <div className="loading-text">Loading file content...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="file-viewer error">
+        <div className="error-message">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="file-viewer">
-      <div className="file-header">
-        <span className="filename">{filename}</span>
+      <div className="file-viewer-header">
+        <span className="file-name">{selectedFile}</span>
       </div>
-      <CodeMirror
-        value={content}
-        height="100%"
-        theme={oneDark}
-        extensions={[
-          getLanguageExtension(),
-          EditorView.lineWrapping,
-          EditorView.theme({
-            '&': {
-              fontSize: '14px',
-              height: '100%'
-            }
-          })
-        ]}
-        readOnly={true}
-        basicSetup={{
-          lineNumbers: true,
-          foldGutter: true,
-          highlightActiveLine: true,
-          highlightSelectionMatches: true,
-          syntaxHighlighting: true
-        }}
-      />
+      <div className="file-content">
+        <pre>
+          <code>{content}</code>
+        </pre>
+      </div>
     </div>
   );
 };

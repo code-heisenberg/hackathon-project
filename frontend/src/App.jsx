@@ -2,15 +2,22 @@ import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { FiSun, FiMoon, FiFolder, FiFile, FiTerminal, FiChevronRight, FiGithub, FiLogOut } from 'react-icons/fi'
 import Editor from '@monaco-editor/react'
-import { Terminal } from 'xterm'
-import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import Login from './components/Login'
 import FileTree from './components/FileTree';
 import FileViewer from './components/FileViewer';
 import './components/FileTree.css';
 import './components/FileViewer.css';
+import WebContainerTerminal from './components/WebContainerTerminal';
+import './components/WebContainerTerminal.css';
 import { mockFileStructure } from './mockData/fileStructure';
+import IDE from './components/IDE';
+import RepoSearchModal from './components/RepoSearchModal';
+import { githubService } from './services/githubService';
+import { fileSystem } from './services/fileSystem';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import Terminal from './components/Terminal';
 
 // Mock data for demonstration
 
@@ -22,14 +29,17 @@ function App() {
     { type: 'user', content: 'Create a React component for a user profile card' },
     { type: 'assistant', content: 'I\'ve created a ProfileCard component with the following features:\n\n- User avatar\n- Name and title\n- Bio section\n- Social links\n\nThe component is responsive and includes hover effects. Would you like to see the code?' }
   ])
+  const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [fileContent, setFileContent] = useState('');
   const [terminalOutput, setTerminalOutput] = useState([])
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState(null)
   const [authError, setAuthError] = useState(null)
   const terminalRef = useRef(null)
   const terminalInstance = useRef(null)
+  const [isRepoModalOpen, setIsRepoModalOpen] = useState(false);
+  const [currentRepo, setCurrentRepo] = useState(null);
+  const [loadingProgress, setLoadingProgress] = useState({ loading: false, total: 0, loaded: 0 });
 
   useEffect(() => {
     // Check for stored user data
@@ -209,24 +219,17 @@ function App() {
     setTheme(theme === 'light' ? 'dark' : 'light')
   }
 
-  const handleFileSelect = (filePath) => {
-    const findFile = (files) => {
-      for (const file of files) {
-        if (file.path === filePath) {
-          return file;
-        }
-        if (file.children) {
-          const found = findFile(file.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-
-    const file = findFile(mockFileStructure);
-    if (file && file.type === 'file') {
-      setSelectedFile(file.path);
-      setFileContent(file.content);
+  const handleFileSelect = (node) => {
+    if (node.type === 'file') {
+      setSelectedFile(node.path);
+      // Load file content using fileSystem
+      fileSystem.readFile(node.path).then(content => {
+        // Handle file content if needed
+        console.log('File loaded:', node.path);
+      }).catch(error => {
+        console.error('Error loading file:', error);
+        toast.error('Failed to load file: ' + error.message);
+      });
     }
   };
 
@@ -287,10 +290,127 @@ export default function ProfileCard({ user }) {
       setLoading(false)
       setPrompt('')
     }
-  }
+  };
+
+  const convertAndLoadFiles = async (files, basePath = '/') => {
+    let totalFiles = 0;
+    let loadedFiles = 0;
+
+    // Count total files recursively
+    const countFiles = (items) => {
+      for (const item of items) {
+        if (item.type === 'file') {
+          totalFiles++;
+        } else if (item.children) {
+          countFiles(item.children);
+        }
+      }
+    };
+    countFiles(files);
+    setLoadingProgress({ loading: true, total: totalFiles, loaded: 0 });
+
+    // Load files with progress
+    const loadFilesWithProgress = async (items, currentPath = '/') => {
+      for (const file of items) {
+        const fullPath = `${currentPath}${file.name}`;
+        
+        if (file.type === 'dir') {
+          await fileSystem.ensureDirectoryExists(fullPath);
+          if (file.children) {
+            await loadFilesWithProgress(file.children, `${fullPath}/`);
+          }
+        } else {
+          try {
+            const content = await githubService.getFileContent(file.repo, file.path);
+            await fileSystem.createFile(fullPath, content);
+            loadedFiles++;
+            setLoadingProgress(prev => ({ ...prev, loaded: loadedFiles }));
+          } catch (error) {
+            console.error(`Error loading file ${file.path}:`, error);
+            continue;
+          }
+        }
+      }
+    };
+
+    try {
+      await loadFilesWithProgress(files);
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoadingProgress({ loading: false, total: 0, loaded: 0 });
+    }
+  };
+
+  const handleLoadRepo = async (repo) => {
+    try {
+      const repoFiles = await githubService.loadRepositoryFiles(repo);
+      await fileSystem.ensureInitialized();
+      await fileSystem.clear();
+      await convertAndLoadFiles(repoFiles);
+      setFiles(repoFiles);
+      setCurrentRepo(repo);
+      toast.success('Repository loaded successfully!');
+    } catch (error) {
+      console.error('Error loading repository:', error);
+      toast.error('Failed to load repository: ' + error.message);
+      setLoadingProgress({ loading: false, total: 0, loaded: 0 });
+    }
+  };
+
+  const handleTerminalCommand = async (command) => {
+    try {
+      setTerminalOutput(prev => [...prev, { type: 'input', content: command }]);
+      
+      // Execute the command in the current repository context
+      if (currentRepo) {
+        const result = await executeCommand(command, currentRepo.full_name);
+        setTerminalOutput(prev => [...prev, { type: 'output', content: result }]);
+      } else {
+        setTerminalOutput(prev => [...prev, { 
+          type: 'error', 
+          content: 'No repository loaded. Please load a repository first.' 
+        }]);
+      }
+    } catch (error) {
+      setTerminalOutput(prev => [...prev, { 
+        type: 'error', 
+        content: error.message 
+      }]);
+    }
+  };
+
+  const executeCommand = async (command, repoFullName) => {
+    // Split command into parts
+    const parts = command.trim().split(' ');
+    const cmd = parts[0];
+    const args = parts.slice(1);
+
+    // Get the current working directory
+    const cwd = `c:/Users/JayakrishnanNarayana/works/hackathon-project`;
+
+    try {
+      const result = await new Promise((resolve, reject) => {
+        run_command({
+          Command: cmd,
+          ArgsList: args,
+          Cwd: cwd,
+          Blocking: true
+        }).then(response => {
+          resolve(response.output || 'Command executed successfully');
+        }).catch(error => {
+          reject(new Error(error.message || 'Command execution failed'));
+        });
+      });
+
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to execute command: ${error.message}`);
+    }
+  };
 
   return (
-    <>
+    <div className="app">
       {!user ? (
         <div className="login-container" data-theme={theme}>
           <div className="login-card">
@@ -330,6 +450,13 @@ export default function ProfileCard({ user }) {
               </button>
               <button className="theme-toggle" onClick={toggleTheme}>
                 {theme === 'light' ? <FiMoon /> : <FiSun />}
+              </button>
+              <button
+                className="load-repo-button"
+                onClick={() => setIsRepoModalOpen(true)}
+                disabled={loading}
+              >
+                {loading ? 'Loading...' : 'Load Repository'}
               </button>
             </div>
           </header>
@@ -384,40 +511,73 @@ export default function ProfileCard({ user }) {
           </section>
 
           <section className="preview-section">
-            <div className="file-explorer">
-              <div className="file-tree-container">
-                <FileTree
-                  files={mockFileStructure}
-                  onFileSelect={handleFileSelect}
-                  selectedFile={selectedFile}
-                />
-              </div>
-              <div className="file-content-container">
-                {selectedFile && fileContent ? (
-                  <FileViewer
-                    content={fileContent}
-                    filename={selectedFile.split('/').pop()}
-                  />
-                ) : (
-                  <div className="no-file-selected">
-                    <p>Select a file to view its contents</p>
+            <div className="content">
+              <div className="main-content">
+                {loadingProgress.loading ? (
+                  <div className="loading-overlay">
+                    <div className="loading-content">
+                      <div className="loading-spinner"></div>
+                      <div className="loading-text">
+                        Loading repository files...
+                      </div>
+                      <div className="loading-progress">
+                        <div 
+                          className="progress-bar" 
+                          style={{ 
+                            width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <div className="loading-stats">
+                        {loadingProgress.loaded} / {loadingProgress.total} files loaded
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <div className="left-panel">
+                      <FileTree
+                        files={files}
+                        onSelect={handleFileSelect}
+                        selectedPath={selectedFile}
+                        repoName={currentRepo?.full_name}
+                      />
+                    </div>
+                    <div className="right-panel">
+                      <FileViewer selectedFile={selectedFile} />
+                      <Terminal
+                        output={terminalOutput}
+                        onCommand={handleTerminalCommand}
+                        repoName={currentRepo?.full_name}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
-
-            <div className="sandbox">
-              <div className="terminal-container">
-                <div className="terminal-header">
-                  <FiTerminal /> Terminal
-                </div>
-                <div ref={terminalRef} style={{ height: 'calc(100% - 28px)' }} />
-              </div>
-            </div>
           </section>
+
+          <RepoSearchModal
+            isOpen={isRepoModalOpen}
+            onClose={() => setIsRepoModalOpen(false)}
+            onSelectRepo={handleLoadRepo}
+          />
+
+          <ToastContainer
+            position="bottom-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="dark"
+          />
         </div>
       )}
-    </>
+    </div>
   )
 }
 

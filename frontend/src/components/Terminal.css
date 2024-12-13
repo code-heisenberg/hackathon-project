@@ -1,0 +1,57 @@
+.terminal-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #1e1e1e;
+  font-family: 'Consolas', 'Courier New', monospace;
+  overflow: hidden;
+}
+
+.terminal-header {
+  padding: 6px 12px;
+  background-color: #252526;
+  border-bottom: 1px solid #333333;
+  font-size: 12px;
+  color: #969696;
+  user-select: none;
+}
+
+.terminal-content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background-color: #1e1e1e;
+}
+
+/* XTerm.js specific styles */
+.terminal-content .xterm {
+  height: 100%;
+  padding: 4px;
+}
+
+.terminal-content .xterm-viewport {
+  background-color: #1e1e1e !important;
+}
+
+.terminal-content .xterm-screen {
+  padding: 4px;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4f4f4f;
+}

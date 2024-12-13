@@ -1,22 +1,72 @@
 .file-viewer {
+  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
   background-color: #1e1e1e;
-  border-radius: 4px;
-  overflow: hidden;
+  color: #d4d4d4;
 }
 
-.file-header {
-  padding: 8px 12px;
+.file-viewer.empty,
+.file-viewer.loading,
+.file-viewer.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty-message,
+.loading-text {
+  color: #6e6e6e;
+  font-size: 16px;
+}
+
+.error-message {
+  color: #f14c4c;
+  font-size: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-radius: 50%;
+  border-top-color: #0078d4;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.file-viewer-header {
+  padding: 8px 16px;
   background-color: #252526;
   border-bottom: 1px solid #333;
 }
 
-.filename {
+.file-name {
+  font-size: 14px;
   color: #d4d4d4;
-  font-size: 13px;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.file-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.file-content pre {
+  margin: 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* CodeMirror customizations */

@@ -1,55 +1,67 @@
 import React, { useState } from 'react';
-import { FaFolder, FaFolderOpen, FaFile, FaChevronRight, FaChevronDown } from 'react-icons/fa';
+import './FileTree.css';
 
-const FileTree = ({ files, onFileSelect, selectedFile }) => {
-  const [expandedFolders, setExpandedFolders] = useState(new Set());
+const FileTreeNode = ({ node, onSelect, selectedPath }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isDirectory = node.type === 'dir';
+  const isSelected = selectedPath === node.path;
 
-  const toggleFolder = (path) => {
-    const newExpanded = new Set(expandedFolders);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
-    } else {
-      newExpanded.add(path);
+  const handleClick = (e) => {
+    e.stopPropagation(); // Prevent event bubbling
+    if (isDirectory) {
+      setIsExpanded(!isExpanded);
     }
-    setExpandedFolders(newExpanded);
-  };
-
-  const renderItem = (item, depth = 0) => {
-    const isFolder = item.type === 'dir';
-    const isExpanded = expandedFolders.has(item.path);
-    const isSelected = selectedFile === item.path;
-
-    return (
-      <div key={item.path}>
-        <div
-          className={`file-tree-item ${isSelected ? 'selected' : ''}`}
-          style={{ paddingLeft: `${depth * 20}px` }}
-          onClick={() => isFolder ? toggleFolder(item.path) : onFileSelect(item.path)}
-        >
-          <span className="file-tree-icon">
-            {isFolder ? (
-              <>
-                {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
-                {isExpanded ? <FaFolderOpen /> : <FaFolder />}
-              </>
-            ) : (
-              <FaFile />
-            )}
-          </span>
-          <span className="file-tree-name">{item.name}</span>
-        </div>
-        {isFolder && isExpanded && item.children && (
-          <div className="file-tree-children">
-            {item.children.map(child => renderItem(child, depth + 1))}
-          </div>
-        )}
-      </div>
-    );
+    if (typeof onSelect === 'function') {
+      onSelect(node);
+    }
   };
 
   return (
+    <div className="file-tree-node">
+      <div 
+        className={`file-tree-item ${isSelected ? 'selected' : ''}`}
+        onClick={handleClick}
+      >
+        <span className="file-icon">
+          {isDirectory ? (isExpanded ? '📂' : '📁') : '📄'}
+        </span>
+        <span className="file-name">{node.name}</span>
+      </div>
+      {isDirectory && isExpanded && node.children && (
+        <div className="file-tree-children">
+          {node.children.map((child, index) => (
+            <FileTreeNode
+              key={`${child.path}-${index}`}
+              node={child}
+              onSelect={onSelect}
+              selectedPath={selectedPath}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const FileTree = ({ files, onSelect, selectedPath, repoName }) => {
+  return (
     <div className="file-tree">
-      {files.map(file => renderItem(file))}
+      <div className="file-tree-header">
+        <div className="repo-name">
+          <span className="repo-icon">📦</span>
+          {repoName || 'Project Files'}
+        </div>
+      </div>
+      <div className="file-tree-content">
+        {files && files.map((file, index) => (
+          <FileTreeNode
+            key={`${file.path}-${index}`}
+            node={file}
+            onSelect={onSelect}
+            selectedPath={selectedPath}
+          />
+        ))}
+      </div>
     </div>
   );
 };
