@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
+import axios from 'axios';
 
 const execAsync = promisify(exec);
 
@@ -154,5 +155,75 @@ export async function createWebhook(repoName, webhookUrl) {
         });
     } catch (error) {
         console.warn('Could not create webhook:', error);
+    }
+}
+
+export async function getRepositories(username) {
+    try {
+        const response = await axios.get(`https://api.github.com/users/${username}/repos`, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching repositories:', error);
+        throw error;
+    }
+}
+
+export async function getRepositoryContent(owner, repo, path = '') {
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching repository content:', error);
+        throw error;
+    }
+}
+
+export async function getFileContent(owner, repo, path) {
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`
+            }
+        });
+        
+        if (Array.isArray(response.data)) {
+            throw new Error('Path points to a directory, not a file');
+        }
+
+        // Get the content and decode from base64
+        const content = Buffer.from(response.data.content, 'base64').toString('utf8');
+        return content;
+    } catch (error) {
+        console.error('Error fetching file content:', error);
+        throw error;
+    }
+}
+
+export async function searchCode(query, owner, repo) {
+    try {
+        const response = await axios.get('https://api.github.com/search/code', {
+            params: {
+                q: `${query} repo:${owner}/${repo}`
+            },
+            headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error searching code:', error);
+        throw error;
     }
 }
