@@ -471,3 +471,35 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
 }
+
+.file-explorer {
+  display: flex;
+  height: 100%;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.file-tree-container {
+  width: 250px;
+  border-right: 1px solid #333;
+  height: 100%;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.file-content-container {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.no-file-selected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6e6e6e;
+  font-size: 14px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}

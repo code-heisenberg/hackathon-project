@@ -1,0 +1,73 @@
+.file-tree {
+  background-color: #252526;
+  color: #d4d4d4;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 13px;
+  height: 100%;
+  overflow-y: auto;
+  user-select: none;
+}
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.file-tree-item:hover {
+  background-color: #2a2d2e;
+}
+
+.file-tree-item.selected {
+  background-color: #37373d;
+}
+
+.file-tree-icon {
+  display: flex;
+  align-items: center;
+  margin-right: 6px;
+  color: #c5c5c5;
+}
+
+.file-tree-icon svg {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+}
+
+.file-tree-icon svg:first-child {
+  width: 10px;
+  height: 10px;
+}
+
+.file-tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Folder colors */
+.file-tree-icon svg[class*="FaFolder"] {
+  color: #dcb67a;
+}
+
+/* File colors - you can add more specific file type colors */
+.file-tree-item[class*=".js"] .file-tree-icon svg,
+.file-tree-item[class*=".jsx"] .file-tree-icon svg {
+  color: #519aba;
+}
+
+.file-tree-item[class*=".css"] .file-tree-icon svg {
+  color: #61c6f0;
+}
+
+.file-tree-item[class*=".json"] .file-tree-icon svg {
+  color: #f9c859;
+}
+
+.file-tree-item[class*=".md"] .file-tree-icon svg {
+  color: #519aba;
+}

@@ -6,40 +6,13 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 import Login from './components/Login'
+import FileTree from './components/FileTree';
+import FileViewer from './components/FileViewer';
+import './components/FileTree.css';
+import './components/FileViewer.css';
+import { mockFileStructure } from './mockData/fileStructure';
 
 // Mock data for demonstration
-const mockFileStructure = [
-  {
-    name: 'src',
-    type: 'folder',
-    children: [
-      {
-        name: 'components',
-        type: 'folder',
-        children: [
-          { name: 'Header.jsx', type: 'file', content: 'import React from "react";\n\nexport default function Header() {\n  return (\n    <header>\n      <h1>My App</h1>\n    </header>\n  );\n}' },
-          { name: 'Button.jsx', type: 'file', content: 'import React from "react";\n\nexport default function Button({ children }) {\n  return (\n    <button className="button">{children}</button>\n  );\n}' }
-        ]
-      },
-      {
-        name: 'styles',
-        type: 'folder',
-        children: [
-          { name: 'main.css', type: 'file', content: '.button {\n  padding: 8px 16px;\n  border-radius: 4px;\n  background-color: #3b82f6;\n  color: white;\n}' }
-        ]
-      },
-      { name: 'App.jsx', type: 'file', content: 'import React from "react";\nimport Header from "./components/Header";\nimport Button from "./components/Button";\n\nexport default function App() {\n  return (\n    <div>\n      <Header />\n      <Button>Click me</Button>\n    </div>\n  );\n}' }
-    ]
-  },
-  {
-    name: 'public',
-    type: 'folder',
-    children: [
-      { name: 'index.html', type: 'file', content: '<!DOCTYPE html>\n<html lang="en">\n  <head>\n    <meta charset="UTF-8" />\n    <title>My App</title>\n  </head>\n  <body>\n    <div id="root"></div>\n  </body>\n</html>' }
-    ]
-  },
-  { name: 'package.json', type: 'file', content: '{\n  "name": "my-app",\n  "version": "1.0.0",\n  "dependencies": {\n    "react": "^18.2.0",\n    "react-dom": "^18.2.0"\n  }\n}' }
-]
 
 function App() {
   const [theme, setTheme] = useState('dark')
@@ -49,9 +22,8 @@ function App() {
     { type: 'user', content: 'Create a React component for a user profile card' },
     { type: 'assistant', content: 'I\'ve created a ProfileCard component with the following features:\n\n- User avatar\n- Name and title\n- Bio section\n- Social links\n\nThe component is responsive and includes hover effects. Would you like to see the code?' }
   ])
-  const [fileStructure, setFileStructure] = useState(mockFileStructure)
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [selectedFileContent, setSelectedFileContent] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileContent, setFileContent] = useState('');
   const [terminalOutput, setTerminalOutput] = useState([])
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState(null)
@@ -237,24 +209,26 @@ function App() {
     setTheme(theme === 'light' ? 'dark' : 'light')
   }
 
-  const findFileContent = (items, path) => {
-    for (const item of items) {
-      if (item.type === 'file' && item.name === path) {
-        return item.content
+  const handleFileSelect = (filePath) => {
+    const findFile = (files) => {
+      for (const file of files) {
+        if (file.path === filePath) {
+          return file;
+        }
+        if (file.children) {
+          const found = findFile(file.children);
+          if (found) return found;
+        }
       }
-      if (item.type === 'folder' && item.children) {
-        const content = findFileContent(item.children, path)
-        if (content) return content
-      }
-    }
-    return null
-  }
+      return null;
+    };
 
-  const handleFileSelect = (path) => {
-    setSelectedFile(path)
-    const content = findFileContent(fileStructure, path)
-    setSelectedFileContent(content || '// File content not found')
-  }
+    const file = findFile(mockFileStructure);
+    if (file && file.type === 'file') {
+      setSelectedFile(file.path);
+      setFileContent(file.content);
+    }
+  };
 
   const handlePromptSubmit = async () => {
     if (!prompt.trim()) return
@@ -291,13 +265,6 @@ export default function ProfileCard({ user }) {
 }`
       }
 
-      setFileStructure(prev => {
-        const newStructure = [...prev]
-        const components = newStructure[0].children.find(f => f.name === 'components')
-        components.children.push(newFile)
-        return newStructure
-      })
-
       setChatHistory(prev => [...prev, {
         type: 'assistant',
         content: 'I\'ve created a new ProfileCard component with the following features:\n\n- Responsive design\n- Avatar image\n- Name and title display\n- Bio section\n- Social links integration\n\nThe component has been added to src/components/ProfileCard.jsx. Would you like me to add styling or implement any additional features?'
@@ -321,27 +288,6 @@ export default function ProfileCard({ user }) {
       setPrompt('')
     }
   }
-
-  const FileTree = ({ items, level = 0 }) => (
-    <ul className="file-tree" style={{ paddingLeft: level * 16 }}>
-      {items.map((item, index) => (
-        <li key={index} className="file-tree-item">
-          {item.type === 'folder' ? (
-            <>
-              <FiFolder />
-              <span>{item.name}</span>
-              {item.children && <FileTree items={item.children} level={level + 1} />}
-            </>
-          ) : (
-            <>
-              <FiFile />
-              <span onClick={() => handleFileSelect(item.name)}>{item.name}</span>
-            </>
-          )}
-        </li>
-      ))}
-    </ul>
-  )
 
   return (
     <>
@@ -438,35 +384,29 @@ export default function ProfileCard({ user }) {
           </section>
 
           <section className="preview-section">
-            <div className="file-structure">
-              <h2>File Structure</h2>
-              <FileTree items={fileStructure} />
-            </div>
-
-            <div className="sandbox">
-              <div className="code-editor">
-                {selectedFile ? (
-                  <Editor
-                    height="100%"
-                    theme={theme === 'light' ? 'light' : 'vs-dark'}
-                    language="javascript"
-                    value={selectedFileContent}
-                    options={{
-                      minimap: { enabled: false },
-                      fontSize: 14,
-                      readOnly: true,
-                      lineNumbers: 'on',
-                      renderWhitespace: 'selection',
-                      scrollBeyondLastLine: false
-                    }}
+            <div className="file-explorer">
+              <div className="file-tree-container">
+                <FileTree
+                  files={mockFileStructure}
+                  onFileSelect={handleFileSelect}
+                  selectedFile={selectedFile}
+                />
+              </div>
+              <div className="file-content-container">
+                {selectedFile && fileContent ? (
+                  <FileViewer
+                    content={fileContent}
+                    filename={selectedFile.split('/').pop()}
                   />
                 ) : (
-                  <div style={{ padding: '16px', color: 'var(--text)' }}>
-                    <p>Select a file to view code</p>
+                  <div className="no-file-selected">
+                    <p>Select a file to view its contents</p>
                   </div>
                 )}
               </div>
+            </div>
 
+            <div className="sandbox">
               <div className="terminal-container">
                 <div className="terminal-header">
                   <FiTerminal /> Terminal
